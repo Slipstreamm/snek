@@ -10,7 +10,7 @@ APPLICATION_ID = os.getenv('APPLICATION_ID')
 GUILD_ID = os.getenv('GUILD_ID')  # Optional: For development in a specific server
 
 # Embedded App Configuration
-EMBEDDED_APP_URL = os.getenv('EMBEDDED_APP_URL', 'http://localhost:5000')  # Default to localhost for development
+EMBEDDED_APP_URL = os.getenv('EMBEDDED_APP_URL', 'http://localhost:5010')  # Default to localhost for development
 
 # Game Configuration
 GRID_SIZE = 20  # Size of the game grid (20x20)

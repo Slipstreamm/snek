@@ -14,7 +14,7 @@ class EmbeddedAppManager:
 
     def __init__(self):
         self.server_process = None
-        self.server_port = 5000
+        self.server_port = 5010
         self.server_url = None
 
     async def start_server(self) -> bool:
