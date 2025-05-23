@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="discord:activity" content="true">
+    <meta property="og:title" content="Snake Game">
+    <meta property="og:description" content="Play the classic Snake game in Discord!">
+    <meta property="og:type" content="website">
+    <title>Discord Snake Game</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="game-canvas"></canvas>
+        <div id="game-ui">
+            <div id="score-container">
+                <div id="player-score">Player: 0</div>
+                <div id="ai-score">AI: 0</div>
+            </div>
+            <div id="controls">
+                <button id="up-btn">⬆️</button>
+                <div class="horizontal-controls">
+                    <button id="left-btn">⬅️</button>
+                    <button id="right-btn">➡️</button>
+                </div>
+                <button id="down-btn">⬇️</button>
+            </div>
+            <div id="game-status"></div>
+        </div>
+    </div>
+
+    <!-- Discord SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@discord/embedded-app-sdk@latest/dist/discord-embedded-app-sdk.min.js"></script>
+
+    <!-- Game Scripts -->
+    <script src="game.js"></script>
+    <script src="discord-sdk.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
