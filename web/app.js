@@ -31,7 +31,9 @@ let gameLoop = null;
 let clientId = ''; // Replace with your Discord client ID
 
 // Initialize the game
-async function initGame(mode = 'singleplayer', difficulty = 'medium') {
+async function initGame(mode = 'singleplayer', difficulty = 'medium', isActivity = false) {
+    console.log(`Initializing game: mode=${mode}, difficulty=${difficulty}, isActivity=${isActivity}`);
+
     // Create a new game
     game = new SnakeGame(mode, difficulty);
 
@@ -44,15 +46,29 @@ async function initGame(mode = 'singleplayer', difficulty = 'medium') {
         ai = new SnakeAI(game, difficulty);
     }
 
-    // Initialize Discord SDK
-    const sdkInitialized = await initializeDiscordSDK(clientId);
+    // Initialize Discord SDK if we're in an activity
+    if (isActivity) {
+        console.log('Initializing as Discord Activity');
+        const sdkInitialized = await initializeDiscordSDK(clientId);
 
-    if (sdkInitialized) {
-        // Set up Discord event listeners
-        setupDiscordEventListeners(game);
+        if (sdkInitialized) {
+            // Set up Discord event listeners
+            setupDiscordEventListeners(game);
 
-        // Update Discord activity state
-        updateActivityState(`Playing Snake (${mode})`);
+            // Update Discord activity state
+            updateActivityState(`Playing Snake (${mode})`);
+
+            // Set up periodic state syncing for multiplayer
+            if (mode === 'multiplayer') {
+                console.log('Setting up multiplayer state syncing');
+                // Sync game state every second
+                setInterval(() => {
+                    syncGameState(game);
+                }, 1000);
+            }
+        }
+    } else {
+        console.log('Initializing as standalone game');
     }
 
     // Start the game loop
@@ -82,6 +98,9 @@ function startGameLoop() {
         // Render the game
         renderGame();
 
+        // Update scores in UI
+        updateScores();
+
         // Check if game is over
         if (game.gameOver) {
             clearInterval(gameLoop);
@@ -89,15 +108,58 @@ function startGameLoop() {
 
             // Update game status
             if (game.winner) {
-                gameStatusElement.textContent = `Game Over! Winner: ${game.winner}`;
+                const winnerName = game.winner === 'player' ? 'You' :
+                                  (game.winner === 'ai' ? 'AI' : 'Player ' + game.winner);
+                gameStatusElement.textContent = `Game Over! Winner: ${winnerName}`;
             } else {
                 gameStatusElement.textContent = 'Game Over! It\'s a draw!';
             }
 
             // Update Discord activity state
-            updateActivityState('Game Over');
+            if (window.discordContext && window.discordContext.isActivity) {
+                updateActivityState('Game Over');
+            }
+
+            // Show restart button or instructions
+            showRestartInstructions();
         }
     }, 1000 / FPS);
+}
+
+// Update scores in the UI
+function updateScores() {
+    if (!game) return;
+
+    // Update player score
+    if (game.snakes['player']) {
+        playerScoreElement.textContent = `${game.mode === 'multiplayer' ? 'Your' : 'Player'} Score: ${game.snakes['player'].score}`;
+    }
+
+    // Update AI score in singleplayer mode
+    if (game.mode === 'singleplayer' && game.snakes['ai']) {
+        aiScoreElement.textContent = `AI Score: ${game.snakes['ai'].score}`;
+    }
+
+    // In multiplayer mode, update other player scores
+    if (game.mode === 'multiplayer') {
+        // This would be expanded in a full implementation to show all player scores
+        const otherPlayers = Object.keys(game.snakes).filter(id => id !== 'player');
+        if (otherPlayers.length > 0) {
+            aiScoreElement.textContent = `Other Players: ${otherPlayers.length}`;
+        }
+    }
+}
+
+// Show restart instructions
+function showRestartInstructions() {
+    const gameStatusElement = document.getElementById('game-status');
+    if (!gameStatusElement) return;
+
+    if (window.discordContext && window.discordContext.isActivity) {
+        gameStatusElement.innerHTML += '<br>Type "/restart" to play again!';
+    } else {
+        gameStatusElement.innerHTML += '<br>Press R to restart';
+    }
 }
 
 // Render the game
@@ -200,12 +262,7 @@ function renderGame() {
             }
         });
 
-        // Update score display
-        if (id === 'player') {
-            playerScoreElement.textContent = `Player: ${snake.score}`;
-        } else if (id === 'ai') {
-            aiScoreElement.textContent = `AI: ${snake.score}`;
-        }
+        // We'll handle score updates in the updateScores function
     });
 
     // Draw game over message if applicable
@@ -276,8 +333,45 @@ document.addEventListener('keydown', (event) => {
         case 'ArrowRight':
             game.handleInput('player', Direction.RIGHT);
             break;
+        case 'r':
+        case 'R':
+            // Restart the game if it's over
+            if (game.gameOver) {
+                restartGame();
+            }
+            break;
     }
 });
+
+// Restart the game
+function restartGame() {
+    if (!game) return;
+
+    // Reset the game
+    game.reset();
+
+    // Add players based on mode
+    game.addPlayer('player', GREEN);
+
+    if (game.mode === 'singleplayer') {
+        game.addPlayer('ai', BLUE);
+        ai = new SnakeAI(game, game.aiDifficulty);
+    }
+
+    // Clear game status
+    const gameStatusElement = document.getElementById('game-status');
+    if (gameStatusElement) {
+        gameStatusElement.textContent = '';
+    }
+
+    // Update Discord activity state
+    if (window.discordContext && window.discordContext.isActivity) {
+        updateActivityState(`Playing Snake (${game.mode})`);
+    }
+
+    // Start the game loop
+    startGameLoop();
+}
 
 // Initialize the game when the page loads
 window.addEventListener('load', () => {
@@ -287,8 +381,33 @@ window.addEventListener('load', () => {
     const difficulty = urlParams.get('difficulty') || 'medium';
     const isActivity = urlParams.get('is_activity') === 'true';
 
+    // Get Discord-specific parameters
+    const guildId = urlParams.get('guild_id');
+    const channelId = urlParams.get('channel_id');
+    const activityId = urlParams.get('activity_id');
+
+    // Store Discord context in window object for later use
+    window.discordContext = {
+        guildId,
+        channelId,
+        activityId,
+        isActivity
+    };
+
+    console.log('Discord context:', window.discordContext);
+
     // Get client ID from URL or use a default
     clientId = urlParams.get('client_id') || '1375570370916253766';
+
+    // Check if we're in an iframe (likely a Discord activity)
+    const isInIframe = window !== window.parent;
+    console.log('Running in iframe:', isInIframe);
+
+    // If we're in an iframe and not explicitly marked as an activity, assume we are one
+    if (isInIframe && !isActivity) {
+        window.discordContext.isActivity = true;
+        console.log('Auto-detected as Discord activity');
+    }
 
     // Fetch configuration from the server
     fetch('/api/config')
@@ -301,13 +420,43 @@ window.addEventListener('load', () => {
                 clientId = config.clientId;
             }
 
-            // Initialize the game
-            initGame(mode, difficulty);
+            // Initialize the game with the activity flag
+            initGame(mode, difficulty, window.discordContext.isActivity);
+
+            // Update UI based on mode
+            updateUIForMode(mode);
         })
         .catch(error => {
             console.error('Failed to fetch config:', error);
 
             // Initialize the game with default settings
-            initGame(mode, difficulty);
+            initGame(mode, difficulty, window.discordContext.isActivity);
+
+            // Update UI based on mode
+            updateUIForMode(mode);
         });
 });
+
+// Update UI elements based on game mode
+function updateUIForMode(mode) {
+    const aiScoreElement = document.getElementById('ai-score');
+
+    if (mode === 'multiplayer') {
+        // In multiplayer mode, hide the AI score
+        if (aiScoreElement) {
+            aiScoreElement.style.display = 'none';
+        }
+
+        // Update player score label
+        const playerScoreElement = document.getElementById('player-score');
+        if (playerScoreElement) {
+            playerScoreElement.textContent = 'Your Score: 0';
+        }
+
+        // Add multiplayer instructions
+        const gameStatusElement = document.getElementById('game-status');
+        if (gameStatusElement) {
+            gameStatusElement.textContent = 'Multiplayer mode: Invite friends to join!';
+        }
+    }
+}

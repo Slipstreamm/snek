@@ -61,8 +61,31 @@ def discord_activity():
     mode = request.args.get('mode', 'singleplayer')
     difficulty = request.args.get('difficulty', 'medium')
 
+    # Get Discord-specific parameters
+    guild_id = request.args.get('guild_id')
+    channel_id = request.args.get('channel_id')
+    activity_id = request.args.get('activity_id')
+
+    # Build the query parameters
+    query_params = {
+        'mode': mode,
+        'difficulty': difficulty,
+        'is_activity': 'true'
+    }
+
+    # Add Discord-specific parameters if available
+    if guild_id:
+        query_params['guild_id'] = guild_id
+    if channel_id:
+        query_params['channel_id'] = channel_id
+    if activity_id:
+        query_params['activity_id'] = activity_id
+
+    # Build the query string
+    query_string = '&'.join([f"{k}={v}" for k, v in query_params.items()])
+
     # Redirect to the main app with parameters
-    return redirect(f'/?mode={mode}&difficulty={difficulty}&is_activity=true')
+    return redirect(f'/?{query_string}')
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5010))
