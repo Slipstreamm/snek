@@ -85,7 +85,7 @@ def discord_activity():
     query_string = '&'.join([f"{k}={v}" for k, v in query_params.items()])
 
     # Redirect to the main app with parameters
-    return redirect(f'/?{query_string}')
+    return redirect(f'/snake-game?{query_string}')
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5010))
