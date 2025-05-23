@@ -12,6 +12,9 @@ async function initializeDiscordSDK(clientId) {
             return false;
         }
 
+        // Add Discord iframe class to body for specific styling
+        document.body.classList.add('discord-iframe');
+
         // Create a new instance of the Discord SDK
         discordSdk = new DiscordSDK(clientId);
 
@@ -22,6 +25,9 @@ async function initializeDiscordSDK(clientId) {
         // Check if we're running in an Activity context
         const activityContext = await discordSdk.commands.getContext();
         console.log('Activity context:', activityContext);
+
+        // Apply additional styling adjustments for Discord iframe
+        applyDiscordIframeStyles();
 
         if (activityContext && activityContext.activity) {
             console.log('Running as a Discord Activity');
@@ -152,6 +158,47 @@ async function sendDiscordMessage(message) {
         });
     } catch (error) {
         console.error('Failed to send message:', error);
+    }
+}
+
+// Apply additional styling adjustments for Discord iframe
+function applyDiscordIframeStyles() {
+    // Ensure the game container fits within Discord's iframe
+    const gameContainer = document.getElementById('game-container');
+    if (gameContainer) {
+        // Adjust game container size based on iframe dimensions
+        const adjustGameContainer = () => {
+            const windowWidth = window.innerWidth;
+            const windowHeight = window.innerHeight;
+
+            // Log dimensions for debugging
+            console.log(`Discord iframe dimensions: ${windowWidth}x${windowHeight}`);
+
+            // Adjust canvas size if needed
+            const canvas = document.getElementById('game-canvas');
+            if (canvas) {
+                // Make sure canvas doesn't overflow
+                if (windowWidth < canvas.width) {
+                    const scale = windowWidth / canvas.width * 0.9;
+                    canvas.style.transform = `scale(${scale})`;
+                    canvas.style.transformOrigin = 'center top';
+                }
+            }
+
+            // Adjust UI elements based on available space
+            const controls = document.getElementById('controls');
+            if (controls && windowHeight < 500) {
+                // Make controls smaller in height-constrained environments
+                controls.style.transform = 'scale(0.8)';
+                controls.style.transformOrigin = 'center center';
+            }
+        };
+
+        // Apply adjustments immediately
+        adjustGameContainer();
+
+        // Re-apply when window is resized
+        window.addEventListener('resize', adjustGameContainer);
     }
 }
 

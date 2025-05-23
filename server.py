@@ -1,10 +1,18 @@
 import os
-from flask import Flask, send_from_directory, request, jsonify, redirect, url_for
+from flask import Flask, send_from_directory, request, jsonify
 from flask_cors import CORS
 import config
 
 app = Flask(__name__, static_folder='web')
-CORS(app)  # Enable CORS for all routes
+
+# Configure CORS with specific settings for Discord
+cors_config = {
+    "origins": ["https://discord.com", "https://*.discord.com", "http://localhost:*"],
+    "methods": ["GET", "POST", "OPTIONS"],
+    "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
+    "supports_credentials": True
+}
+CORS(app, resources={r"/*": cors_config})  # Enable CORS with specific settings
 
 # Get the base URL from config or environment
 BASE_URL = config.EMBEDDED_APP_URL
@@ -19,10 +27,22 @@ def snake_game():
     """Alias for the main HTML file to support legacy URLs."""
     return send_from_directory('web', 'index.html')
 
+
+
 @app.route('/<path:path>')
 def static_files(path):
     """Serve static files."""
-    return send_from_directory('web', path)
+    response = send_from_directory('web', path)
+
+    # Set proper MIME types for CSS files
+    if path.endswith('.css'):
+        response.headers['Content-Type'] = 'text/css'
+        # Add cache control headers to prevent caching issues in Discord iframe
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+
+    return response
 
 @app.route('/api/config')
 def get_config():
@@ -61,6 +81,32 @@ def exchange_token():
         'access_token': f'simulated_token_{code[:8] if code else "no_code"}',
         'token_type': 'Bearer',
         'expires_in': 604800
+    })
+
+@app.route('/api/check-discord')
+def check_discord():
+    """Check if the request is coming from Discord."""
+    # Get the referer header
+    referer = request.headers.get('Referer', '')
+
+    # Check if the referer is from Discord
+    is_discord = 'discord.com' in referer
+
+    # Get the user agent
+    user_agent = request.headers.get('User-Agent', '')
+
+    # Check if we're in an iframe
+    is_iframe = request.args.get('is_iframe') == 'true'
+
+    # Get all headers for debugging
+    headers = {key: value for key, value in request.headers.items()}
+
+    return jsonify({
+        'isDiscord': is_discord,
+        'isIframe': is_iframe,
+        'referer': referer,
+        'userAgent': user_agent,
+        'headers': headers
     })
 
 @app.route('/discord-activity', strict_slashes=False)
@@ -114,11 +160,19 @@ def discord_activity():
     if platform:
         query_params['platform'] = platform
 
-    # Build the query string
-    query_string = '&'.join([f"{k}={v}" for k, v in query_params.items()])
+    # Create a response with the main HTML file
+    response = send_from_directory('web', 'index.html')
 
-    # Redirect to the main app with parameters
-    return redirect(f'/snake-game?{query_string}')
+    # Add headers to ensure proper loading in Discord iframe
+    response.headers['X-Frame-Options'] = 'ALLOW-FROM https://discord.com'
+    response.headers['Content-Security-Policy'] = "frame-ancestors 'self' https://discord.com https://*.discord.com;"
+
+    # Add cache control headers to prevent caching issues
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+
+    return response
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5010))

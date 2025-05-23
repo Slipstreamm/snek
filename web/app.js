@@ -24,6 +24,39 @@ const gameStatusElement = document.getElementById('game-status');
 canvas.width = GAME_WIDTH;
 canvas.height = GAME_HEIGHT;
 
+// Adjust canvas size for Discord iframe if needed
+function adjustCanvasForDiscord() {
+    // Check if we're in Discord iframe
+    const isInIframe = window !== window.parent;
+
+    if (isInIframe) {
+        // Get available width and height
+        const availableWidth = window.innerWidth;
+        const availableHeight = window.innerHeight;
+
+        console.log(`Available space in iframe: ${availableWidth}x${availableHeight}`);
+
+        // If available space is smaller than canvas, scale it down
+        if (availableWidth < GAME_WIDTH || availableHeight < GAME_HEIGHT) {
+            const scaleX = availableWidth / GAME_WIDTH * 0.9;
+            const scaleY = availableHeight / GAME_HEIGHT * 0.7;
+            const scale = Math.min(scaleX, scaleY);
+
+            // Apply scale transform
+            canvas.style.transform = `scale(${scale})`;
+            canvas.style.transformOrigin = 'center top';
+
+            console.log(`Scaling canvas by factor: ${scale}`);
+        }
+    }
+}
+
+// Call the adjustment function
+adjustCanvasForDiscord();
+
+// Re-adjust on window resize
+window.addEventListener('resize', adjustCanvasForDiscord);
+
 // Game state
 let game = null;
 let ai = null;
@@ -407,7 +440,51 @@ window.addEventListener('load', () => {
     if (isInIframe && !isActivity) {
         window.discordContext.isActivity = true;
         console.log('Auto-detected as Discord activity');
+
+        // Add Discord iframe class to body for specific styling
+        document.body.classList.add('discord-iframe');
     }
+
+    // Apply Discord iframe class if explicitly marked as an activity
+    if (isActivity) {
+        document.body.classList.add('discord-iframe');
+    }
+
+    // Check with the server if we're running in Discord
+    fetch(`/api/check-discord?is_iframe=${isInIframe}`)
+        .then(response => response.json())
+        .then(data => {
+            console.log('Discord check:', data);
+
+            // If we're in Discord, apply the Discord iframe class
+            if (data.isDiscord) {
+                document.body.classList.add('discord-iframe');
+                console.log('Confirmed running in Discord');
+            }
+
+            // Apply additional styling adjustments for Discord iframe
+            if (isInIframe || data.isDiscord || isActivity) {
+                // Force the Discord iframe class
+                document.body.classList.add('discord-iframe');
+
+                // Apply additional styling
+                const gameContainer = document.getElementById('game-container');
+                if (gameContainer) {
+                    gameContainer.style.padding = '5px';
+                }
+
+                // Adjust canvas size
+                adjustCanvasForDiscord();
+            }
+        })
+        .catch(error => {
+            console.error('Failed to check Discord status:', error);
+
+            // Apply Discord iframe class anyway if we're in an iframe
+            if (isInIframe) {
+                document.body.classList.add('discord-iframe');
+            }
+        });
 
     // Fetch configuration from the server
     fetch('/api/config')
