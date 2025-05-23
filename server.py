@@ -9,9 +9,14 @@ CORS(app)  # Enable CORS for all routes
 # Get the base URL from config or environment
 BASE_URL = config.EMBEDDED_APP_URL
 
-@app.route('/')
+@app.route('/', strict_slashes=False)
 def index():
     """Serve the main HTML file."""
+    return send_from_directory('web', 'index.html')
+
+@app.route('/snake-game', strict_slashes=False)
+def snake_game():
+    """Alias for the main HTML file to support legacy URLs."""
     return send_from_directory('web', 'index.html')
 
 @app.route('/<path:path>')
@@ -46,15 +51,19 @@ def exchange_token():
     data = request.json
     code = data.get('code')
 
+    # Log the code for debugging
+    print(f"Received authorization code: {code}")
+
     # For this example, we'll just return a simulated token
     # In a real app, you would make a request to Discord's token endpoint
+    # using the code to get a real access token
     return jsonify({
-        'access_token': 'simulated_token',
+        'access_token': f'simulated_token_{code[:8] if code else "no_code"}',
         'token_type': 'Bearer',
         'expires_in': 604800
     })
 
-@app.route('/discord-activity')
+@app.route('/discord-activity', strict_slashes=False)
 def discord_activity():
     """Special route for Discord Activity."""
     # Get parameters from the request
@@ -65,6 +74,16 @@ def discord_activity():
     guild_id = request.args.get('guild_id')
     channel_id = request.args.get('channel_id')
     activity_id = request.args.get('activity_id')
+    instance_id = request.args.get('instance_id')
+    location_id = request.args.get('location_id')
+    launch_id = request.args.get('launch_id')
+    referrer_id = request.args.get('referrer_id')
+    custom_id = request.args.get('custom_id')
+    frame_id = request.args.get('frame_id')
+    platform = request.args.get('platform')
+
+    # Log all parameters for debugging
+    print(f"Discord Activity Request: {request.args}")
 
     # Build the query parameters
     query_params = {
@@ -80,12 +99,26 @@ def discord_activity():
         query_params['channel_id'] = channel_id
     if activity_id:
         query_params['activity_id'] = activity_id
+    if instance_id:
+        query_params['instance_id'] = instance_id
+    if location_id:
+        query_params['location_id'] = location_id
+    if launch_id:
+        query_params['launch_id'] = launch_id
+    if referrer_id:
+        query_params['referrer_id'] = referrer_id
+    if custom_id:
+        query_params['custom_id'] = custom_id
+    if frame_id:
+        query_params['frame_id'] = frame_id
+    if platform:
+        query_params['platform'] = platform
 
     # Build the query string
     query_string = '&'.join([f"{k}={v}" for k, v in query_params.items()])
 
     # Redirect to the main app with parameters
-    return redirect(f'/snake-game?{query_string}')
+    return redirect(f'/?{query_string}')
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5010))
